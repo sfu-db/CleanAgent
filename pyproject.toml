@@ -7,8 +7,9 @@ license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.8, <3.12"
+python = ">=3.8,<3.9.7 || >3.9.7,<3.12"
 pyautogen = "^0.2.0"
+streamlit = "^1.29.0"
 
 
 [build-system]
