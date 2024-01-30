@@ -1,4 +1,4 @@
-# CleanAgent
+# CleanAgent: Automatically Standardize Your Data with LLM-based Agents
 ### Introduction
 **`CleanAgent`** is a tool that automates the data standardization process with LLM-based Agents. You only need to upload the table that needs to be standardized, and **`CleanAgent`** will get your hands free, standardize your data automatically and return the standardized table to you.
 Our demo paper **CleanAgent: Automating Data Standardization with LLM-based Agents** will be published in the future.
@@ -10,6 +10,7 @@ git clone https://github.com/sfu-db/CleanAgent
 cd CleanAgent
 conda create -n cleanagent python=3.10.6
 conda activate
+export OPENAI_API_KEY="Your_Openai_API_Key"
 pip install -r requirements.txt
 chainlit run main.py
 ```
