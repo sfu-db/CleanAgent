@@ -18,7 +18,7 @@ Then you can see the web UI of **`CleanAgent`** on `http://localhost:8000`
 ### Demonstration
 You also can watch the following 4-mins demo to learn how to use **`CleanAgent`**:
 
-<a href="https://youtu.be/fSYXVM6qeqM"><img src=""/></a>
+<a href="https://youtu.be/fSYXVM6qeqM"><img src="assets/git_page.png"/></a>
 
 ### Citation
 If you think **`CleanAgent`** is useful for you, please considering to cite our **`CleanAgent`**:
