@@ -3,6 +3,8 @@
 **`CleanAgent`** is a tool that automates the data standardization process with LLM-based Agents. You only need to upload the table that needs to be standardized, and **`CleanAgent`** will get your hands free, standardize your data automatically and return the standardized table to you.
 Our demo paper **CleanAgent: Automating Data Standardization with LLM-based Agents** will be published in the future.
 
+If you think this small project is interesting or helpful to you, please considering give us a star:star2::star2::star2:! :smiley:
+
 ### Usage
 Please use **`CleanAgent`** with the following commands:
 ```shell
