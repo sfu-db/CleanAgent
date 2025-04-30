@@ -27,8 +27,8 @@ You also can watch the following 4-mins demo to learn how to use **`CleanAgent`*
 If you think **`CleanAgent`** is useful for you, please considering to cite our **`CleanAgent`**:
 ```bibtex
 @article{qi2024cleanagent,
-  title={CleanAgent: Automating Data Standardization with LLM-based Agents},
-  author={Qi, Danrui and Wang, Jiannan},
+  title={CleanAgent: Automating data standardization with LLM-based agents},
+  author={Qi, Danrui and Miao, Zhengjie and Wang, Jiannan},
   journal={arXiv preprint arXiv:2403.08291},
   year={2024}
 }
