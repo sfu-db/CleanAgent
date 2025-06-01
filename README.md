@@ -11,7 +11,7 @@ Please use **`CleanAgent`** with the following commands:
 git clone https://github.com/sfu-db/CleanAgent
 cd CleanAgent
 conda create -n cleanagent python=3.10.6
-conda activate
+conda activate cleanagent
 export OPENAI_API_KEY="Your_Openai_API_Key"
 pip install -r requirements.txt
 chainlit run main.py
