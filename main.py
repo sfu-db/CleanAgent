@@ -9,24 +9,45 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
+import os
+
+os.environ["AUTOGEN_USE_DOCKER"] = "False"
+
 df = pd.DataFrame({})
 upload_path = ""
 CLEANED_DATA_STROAGE_DIR = "cleaned_data_folder"
 
-CANDIDATE_COLUMN_TYPES = "email, phone, date, country, IP Address, SSN"
+CANDIDATE_COLUMN_TYPES = "email, phone, date, country, IP Address"
 termination_notice = '\n\nIf you think all the conversations complete the task correctly and smoothly, then ONLY output TERMINATE ' \
                                   'to indicate the conversation is finished and this is your last message.'
 
 COL_ANNOTATOR_SYSTEM_MESSAGE = """You are an expert column type annotator.
             Please solve the column type annotation task following the instruction. Please ALWAYS show the column annotation result!!! Please ONLY return the column annotation result adding a sentence "Please using corresponding clean functions and write code to clean the column"!!! 
-            If the question cannot be answered using the information provided, answer with 'I donnot know'
             Classify the columns of a given table with only one of the following classes that are seperated with comma: {candidate_column_types}.
                 1. Look at the input given to you and make a table out of it.
                 2. Look at the cell values in detail.
                 3. For each column, select a class that best represents the meaning of all cells in the column.
-                4. Answer with the selected class for each columns with the format columnName: class.
+                4. Answer with the selected class for each columns with the format **columnName: class**. If you cannot confidently classify a column based on the provided data, output "I do not know" for that column.
+            NOTE THAT You MUST provide exactly one classification for EVERY column — no column should be left unclassified.
             Sample rows of the given table is shown as follows: {df}.\n
             """
+# COL_ANNOTATOR_SYSTEM_MESSAGE = """You are an expert in column type annotation.
+# Please solve the column type annotation task following the instruction strictly,
+# Classify the columns of a given table with only one of the following classes that are seperated with comma: {candidate_column_types}.
+#     1. Read the provided input and interpret it as a table.
+#     2. Carefully examine the cell values in each column.
+#     3. You MUST provide exactly one classification for EVERY column — no column should be left unclassified.
+#     4. If you cannot confidently classify a column based on the provided data, output "I do not know" for that column.
+#     5. Only output the column annotation results in this exact format **columnName: class** WITHOUT ANY EXPLANATION.
+#     6. After the annotation results, append this exact sentence: "Please use corresponding clean functions and write code to clean the column."
+#     7. If the overall question cannot be answered based on the provided data, respond with "I do not know".
+
+# Classification:
+#     Classify each column into one and only one of the following classes (separated by commas): {candidate_column_types}
+
+# Sample Data:
+# {df}
+# """
 PROBLEM = """Use dataprep library to clean the table {path}.\n
             Please follow the three steps:\n
             1. Use column annotator to annotate the type of each column within the five types: {candidate_column_types}. \n
@@ -34,7 +55,7 @@ PROBLEM = """Use dataprep library to clean the table {path}.\n
             3. store the cleaned dataframe as csv file named as 'cleaned_data.csv'\n"""
 
 CONFIG_LIST = [{
-            'model': 'gpt-4-1106-preview',
+            'model': 'gpt-4o-2024-08-06',
             'api_key': config("OPENAI_API_KEY")
         }]
 
@@ -237,13 +258,53 @@ async def start_chat(message, is_test=False, have_extra_requirement=False, extra
         col_annotator = AssistantAgent(
             name="Column_Type_Annotator",
             is_termination_msg=TERMINATION_MESSAGE,
-            system_message=COL_ANNOTATOR_SYSTEM_MESSAGE.format(candidate_column_types=CANDIDATE_COLUMN_TYPES, df=df.head()),
+            system_message=COL_ANNOTATOR_SYSTEM_MESSAGE.format(candidate_column_types=CANDIDATE_COLUMN_TYPES, df=df.head().to_markdown()),
             llm_config=llm_config,
         )
 
         coder = AssistantAgent(
             name="Python_Programmer",
             is_termination_msg=TERMINATION_MESSAGE,
+            # system_message=f"""You are a senior python engineer who is responsible for writing python code to clean the input dataframe. 
+            #                      You can use the following libraries: pandas, numpy, re, datetime, dataprep, and any other libraries you want. Note that the dataprep library takes the first priority.
+            #                      The dataprep library is used to clean the data. You can find the documentation of dataprep library here: https://sfu-db.github.io/dataprep/.
+            #                      Please only output the code.
+
+            #                     #### Detailed Instructions:
+            #                     - imports pandas and Dataprep.Clean  
+            #                     - uses **df = clean_<type>** for all columns with available types  
+            #                     - if a type is not supported by Dataprep, fall back to a popular PyPI package; if none, use regex-based cleaning  
+            #                     - saves the cleaned result to cleaned_data.csv in the current working directory  
+            #                     - applies the following standardization rules:
+            #                         #### Standardization Rules:  
+            #                         - date → YYYY-MM-DD hh:mm:ss  
+            #                         - address → Apt apartment_number, house_number, street_name, city, state_abbreviation, country, zipcode  
+            #                         (skip missing parts silently)  
+            #                         - phone_number → E.164 format  
+            #                         - location → (lat,lon)  
+            #                         - ip → plain IP without subnet mask  
+            #                         - temperatures → float value with Celsius unit (e.g., 36.5°C) 
+
+            #                     #### Available Dataprep functions (partial):  
+            #                     clean_email, clean_phone, clean_url, clean_date, clean_lat_long, clean_ip, clean_address, clean_country, clean_text, clean_headers  
+            #                     (Companion validators: validate_email, validate_phone, ...)
+
+            #                     # Function                        Purpose                                   Key Parameters / Notes
+            #                     # -------------------------       ---------------------------------------   -----------------------------------------------
+            #                     # clean_email(df, col_name)       Standardize email addresses.              remove_whitespace; errors ('coerce', 'ignore'); inplace (True, False).
+            #                     # clean_phone(df, col_name)       Clean & format North‑American numbers.    output_format ('nanp', 'national', 'e164'); errors ('coerce', 'ignore'); inplace (True, False).
+            #                     # clean_url(df, col_name)         Normalize URLs and extract components.    split adds scheme/netloc/path/query_params; inplace (True, False)
+            #                     # clean_date(df, col_name)        Parse and standardize date/time strings.  output_format ('YYYY-MM-DD', 'YYYY-MM-DD hh:mm:ss'); inplace (True, False).
+            #                     # clean_lat_long(df, col_name)    Clean geographic coordinate pairs.        output_format ('dd', 'ddh', 'dm', 'dms'); errors ('coerce', 'ignore'); inplace (True, False)
+            #                     # clean_ip(df, col_name)          Validate & format IPv4/IPv6 addresses.    output_format ('compressed', 'full', 'binary', 'hexa', 'integer', 'packed'); errors ('coerce', 'ignore'); inplace (True, False)
+            #                     # clean_address(df, col_name)     Clean US street addresses.                output_format ('USER can define the output format, such as **apartment, house_number, street_name, city, state_abbr, country, zipcode**'); uses usaddress; errors ('coerce', 'ignore'); inplace (True, False)
+            #                     # clean_country(df, col_name)     Standardize country names / ISO codes.    output_format ('name', 'official', 'alpha-2', 'alpha-3', 'numeric'); errors ('coerce', 'ignore'); inplace (True, False)
+            #                     # clean_text(df, col_name)        General text cleaning pipeline.           defaule pipeline, no parameters are needed.
+            #                     # clean_headers(df, col_name)     Standardize DataFrame column names.       case ('kebab', 'camel', 'pascal', 'const', 'sentence', 'title', 'lower', 'upper').
+            #                     # ...                             ...                                       ...
+
+            #                     Note that each clean function output a DataFrame combining original columns and cleaned columns, please uses **df = clean_<type>** for all columns with available types.
+            #                     Return only the Python script. No extra explanations.\n"""+ extra_require + termination_notice,
             system_message=f"""You are a senior python engineer who is responsible for writing python code to clean the input dataframe. 
                                 You can use the following libraries: pandas, numpy, re, datetime, dataprep, and any other libraries you want. Note that the dataprep library takes the first priority.
                                 The dataprep library is used to clean the data. You can find the documentation of dataprep library here: https://sfu-db.github.io/dataprep/.
@@ -263,16 +324,61 @@ async def start_chat(message, is_test=False, have_extra_requirement=False, extra
         #     },
         # )
     else:
+        print(df.columns)
+        print(COL_ANNOTATOR_SYSTEM_MESSAGE.format(candidate_column_types=CANDIDATE_COLUMN_TYPES, df=df.head().to_markdown()))
+        # import pdb
+        # pdb.set_trace()
+
         col_annotator = AssistantAgent(
             name="Column_Type_Annotator",
             is_termination_msg=TERMINATION_MESSAGE,
-            system_message=COL_ANNOTATOR_SYSTEM_MESSAGE.format(candidate_column_types=CANDIDATE_COLUMN_TYPES, df=df.head()),
+            system_message=COL_ANNOTATOR_SYSTEM_MESSAGE.format(candidate_column_types=CANDIDATE_COLUMN_TYPES, df=df.head().to_markdown()),
             llm_config=llm_config,
         )
 
         coder = AssistantAgent(
             name="Python_Programmer",
             is_termination_msg=TERMINATION_MESSAGE,
+            # system_message=f"""You are a senior python engineer who is responsible for writing python code to clean the input dataframe. 
+            #                      You can use the following libraries: pandas, numpy, re, datetime, dataprep, and any other libraries you want. Note that the dataprep library takes the first priority.
+            #                      The dataprep library is used to clean the data. You can find the documentation of dataprep library here: https://sfu-db.github.io/dataprep/.
+            #                      Please only output the code.
+
+            #                     #### Detailed Instructions:
+            #                     - imports pandas and Dataprep.Clean  
+            #                     - uses **df = clean_<type>** for all columns with available types  
+            #                     - if a type is not supported by Dataprep, fall back to a popular PyPI package; if none, use regex-based cleaning  
+            #                     - saves the cleaned result to cleaned_data.csv in the current working directory  
+            #                     - applies the following standardization rules:
+            #                         #### Standardization Rules:  
+            #                         - date → YYYY-MM-DD hh:mm:ss  
+            #                         - address → Apt apartment_number, house_number, street_name, city, state_abbreviation, country, zipcode  
+            #                         (skip missing parts silently)  
+            #                         - phone_number → E.164 format  
+            #                         - location → (lat,lon)  
+            #                         - ip → plain IP without subnet mask  
+            #                         - temperatures → float value with Celsius unit (e.g., 36.5°C) 
+
+            #                     #### Available Dataprep functions (partial):  
+            #                     clean_email, clean_phone, clean_url, clean_date, clean_lat_long, clean_ip, clean_address, clean_country, clean_text, clean_headers  
+            #                     (Companion validators: validate_email, validate_phone, ...)
+
+            #                     # Function                        Purpose                                   Key Parameters / Notes
+            #                     # -------------------------       ---------------------------------------   -----------------------------------------------
+            #                     # clean_email(df, col_name)       Standardize email addresses.              remove_whitespace; errors ('coerce', 'ignore'); inplace (True, False).
+            #                     # clean_phone(df, col_name)       Clean & format North‑American numbers.    output_format ('nanp', 'national', 'e164'); errors ('coerce', 'ignore'); inplace (True, False).
+            #                     # clean_url(df, col_name)         Normalize URLs and extract components.    split adds scheme/netloc/path/query_params; inplace (True, False)
+            #                     # clean_date(df, col_name)        Parse and standardize date/time strings.  output_format ('YYYY-MM-DD', 'YYYY-MM-DD hh:mm:ss'); inplace (True, False).
+            #                     # clean_lat_long(df, col_name)    Clean geographic coordinate pairs.        output_format ('dd', 'ddh', 'dm', 'dms'); errors ('coerce', 'ignore'); inplace (True, False)
+            #                     # clean_ip(df, col_name)          Validate & format IPv4/IPv6 addresses.    output_format ('compressed', 'full', 'binary', 'hexa', 'integer', 'packed'); errors ('coerce', 'ignore'); inplace (True, False)
+            #                     # clean_address(df, col_name)     Clean US street addresses.                output_format ('USER can define the output format, such as **apartment, house_number, street_name, city, state_abbr, country, zipcode**'); uses usaddress; errors ('coerce', 'ignore'); inplace (True, False)
+            #                     # clean_country(df, col_name)     Standardize country names / ISO codes.    output_format ('name', 'official', 'alpha-2', 'alpha-3', 'numeric'); errors ('coerce', 'ignore'); inplace (True, False)
+            #                     # clean_text(df, col_name)        General text cleaning pipeline.           defaule pipeline, no parameters are needed.
+            #                     # clean_headers(df, col_name)     Standardize DataFrame column names.       case ('kebab', 'camel', 'pascal', 'const', 'sentence', 'title', 'lower', 'upper').
+            #                     # ...                             ...                                       ...
+
+            #                     Note that each clean function output a DataFrame combining original columns and cleaned columns, please uses **df = clean_<type>** for all columns with available types.
+            #                     Return only the Python script. No extra explanations."""+ termination_notice,
             system_message=f"""You are a senior python engineer who is responsible for writing python code to clean the input dataframe. 
                                 You can use the following libraries: pandas, numpy, re, datetime, dataprep, and any other libraries you want. Note that the dataprep library takes the first priority.
                                 The dataprep library is used to clean the data. You can find the documentation of dataprep library here: https://sfu-db.github.io/dataprep/.
@@ -319,4 +425,3 @@ if __name__ == "__main__":
     # upload_path = "/Users/danruiqi/Desktop/Danrui/Research/CleanAgent/CleanAgent-main/clean-agent/origin_data.csv"
     message = PROBLEM.format(path=upload_path, candidate_column_types=CANDIDATE_COLUMN_TYPES)
     start_chat(message=message)
-

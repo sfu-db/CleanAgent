@@ -1,3 +1,8 @@
-chainlit
+chainlit==1.0.101
 pyautogen
 python-decouple
+ipython
+autogen[retrievechat]
+pandas
+matplotlib
+tabulate
